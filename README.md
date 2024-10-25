@@ -1,6 +1,6 @@
 # Figura - A MacOS Background Remover
 
-![image](https://github.com/user-attachments/assets/2a7d6b66-d2f8-434b-b159-05a6de8e468c)
+![image](https://github.com/user-attachments/assets/dc2dc142-ef86-4655-9034-2cb1e52db842)
 
 
 A sleek, native macOS app that removes backgrounds from images with a minimal interface and modern design.
