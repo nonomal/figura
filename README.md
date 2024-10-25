@@ -3,8 +3,7 @@
 ![image](https://github.com/user-attachments/assets/dc2dc142-ef86-4655-9034-2cb1e52db842)
 
 
-A sleek, native macOS app that removes backgrounds from images with a minimal interface and modern design.
-Because the world needs more native background removers.
+A sleek, native macOS app that removes backgrounds from images with a minimal interface and modern design. It's fast!
 
 ## Features
 - **One-Click Background Removal**: Instantly remove backgrounds from any image
