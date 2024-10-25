@@ -8,16 +8,28 @@ class BackgroundRemovalManager: ObservableObject {
     @Published var isLoading = false
     @Published var inputImage: NSImage?
     @Published var processedImage: NSImage?
+    @Published var uploadState: UploadState = .idle
+    
     private let processingQueue = DispatchQueue(label: "ProcessingImageQueue")
     private let lock = NSLock()
     
+    enum UploadState {
+        case idle
+        case uploading
+        case processing
+        case completed
+        case error(String)
+    }
+    
     func processImage(_ image: NSImage) {
         guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            uploadState = .error("Failed to process image")
             return
         }
         
         Task { @MainActor in
             isLoading = true
+            uploadState = .processing
         }
         
         let ciImage = CIImage(cgImage: cgImage)
@@ -30,10 +42,12 @@ class BackgroundRemovalManager: ObservableObject {
                 await MainActor.run {
                     self.processedImage = NSImage(cgImage: cgOutput, size: imageSize)
                     self.isLoading = false
+                    self.uploadState = .completed
                 }
             } else {
                 await MainActor.run {
                     self.isLoading = false
+                    self.uploadState = .error("Failed to process image")
                 }
             }
         }
@@ -70,12 +84,10 @@ struct ContentView: View {
     
     var body: some View {
         ZStack {
-            // Glass background
             VisualEffectBlur(material: .headerView, blendingMode: .behindWindow)
                 .ignoresSafeArea()
             
             VStack(spacing: 20) {
-                // Image display area
                 ZStack {
                     if let image = manager.processedImage {
                         Image(nsImage: image)
@@ -83,6 +95,14 @@ struct ContentView: View {
                             .scaledToFit()
                             .frame(maxWidth: 400, maxHeight: 400)
                             .transition(.opacity)
+                            .contextMenu {
+                                Button("Copy Image") {
+                                    copyImageToPasteboard(image)
+                                }
+                                Button("Save Image") {
+                                    saveProcessedImage()
+                                }
+                            }
                     } else if let image = manager.inputImage {
                         Image(nsImage: image)
                             .resizable()
@@ -96,15 +116,31 @@ struct ContentView: View {
                     if manager.isLoading {
                         LoaderView()
                     }
+                    
+                    if case .error(let message) = manager.uploadState {
+                        Text(message)
+                            .foregroundColor(.red)
+                            .padding()
+                            .background(Color.black.opacity(0.7))
+                            .cornerRadius(8)
+                    }
                 }
                 .animation(.easeInOut, value: manager.processedImage != nil)
                 
-                // Save button
                 if manager.processedImage != nil {
-                    Button("Save Image") {
-                        saveProcessedImage()
+                    HStack(spacing: 20) {
+                        Button("Copy") {
+                            if let image = manager.processedImage {
+                                copyImageToPasteboard(image)
+                            }
+                        }
+                        .buttonStyle(GlassButtonStyle())
+                        
+                        Button("Save") {
+                            saveProcessedImage()
+                        }
+                        .buttonStyle(GlassButtonStyle())
                     }
-                    .buttonStyle(GlassButtonStyle())
                     .disabled(manager.isLoading)
                 }
             }
@@ -124,7 +160,7 @@ struct ContentView: View {
                     manager.processImage(image)
                 }
             case .failure(let error):
-                print("Error selecting image: \(error)")
+                manager.uploadState = .error(error.localizedDescription)
             }
         }
         .onDrop(of: [.image], isTargeted: $isDragging) { providers in
@@ -137,10 +173,20 @@ struct ContentView: View {
                         manager.inputImage = image
                         manager.processImage(image)
                     }
+                } else if let error = error {
+                    Task { @MainActor in
+                        manager.uploadState = .error(error.localizedDescription)
+                    }
                 }
             }
             return true
         }
+    }
+    
+    private func copyImageToPasteboard(_ image: NSImage) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.writeObjects([image])
     }
     
     private func saveProcessedImage() {
@@ -154,12 +200,17 @@ struct ContentView: View {
         savePanel.message = "Choose a location to save the processed image"
         savePanel.nameFieldStringValue = "processed_image.png"
         
-        savePanel.begin { response in
-            if response == .OK, let url = savePanel.url,
-               let tiffData = processedImage.tiffRepresentation,
-               let bitmap = NSBitmapImageRep(data: tiffData),
-               let pngData = bitmap.representation(using: .png, properties: [:]) {
-                try? pngData.write(to: url)
+        let response = savePanel.runModal()
+        
+        if response == .OK,
+           let url = savePanel.url,
+           let tiffData = processedImage.tiffRepresentation,
+           let bitmap = NSBitmapImageRep(data: tiffData),
+           let pngData = bitmap.representation(using: .png, properties: [:]) {
+            do {
+                try pngData.write(to: url)
+            } catch {
+                manager.uploadState = .error("Failed to save image: \(error.localizedDescription)")
             }
         }
     }
