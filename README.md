@@ -10,8 +10,11 @@ A sleek, native macOS app that removes backgrounds from images with a minimal in
 - **Multiple Input Methods**: Drag & drop, paste (⌘V), or click to upload
 - **Native Performance**: Built with SwiftUI and Vision framework for optimal processing
 - **Dark and Light modes**: Because we care about your eyes
+  
 
-https://github.com/user-attachments/assets/4773fb27-ed72-4f9a-84ff-93c1c180ef23
+https://github.com/user-attachments/assets/2599e483-8a5e-4147-8a81-c647a6e9f1cb
+
+
 
 ## 💻 Get it
 You can find the .app here:
