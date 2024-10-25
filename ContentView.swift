@@ -153,30 +153,33 @@ struct ContentView: View {
                 .animation(.easeInOut, value: manager.processedImage != nil)
                 
                 if manager.processedImage != nil {
-                    HStack(spacing: 20) {
-                        Button("Copy") {
-                            if let image = manager.processedImage {
-                                copyImageToPasteboard(image)
+                                    ButtonGroup(buttons: [
+                                        (
+                                            title: "Copy",
+                                            icon: "doc.on.doc",
+                                            action: {
+                                                if let image = manager.processedImage {
+                                                    copyImageToPasteboard(image)
+                                                }
+                                            }
+                                        ),
+                                        (
+                                            title: "Save",
+                                            icon: "arrow.down.circle",
+                                            action: saveProcessedImage
+                                        ),
+                                        (
+                                            title: "Clear",
+                                            icon: "trash",
+                                            action: manager.clearImages
+                                        )
+                                    ])
+                                    .disabled(manager.isLoading)
+                                }
                             }
+                            .padding(30)
                         }
-                        .buttonStyle(GlassButtonStyle())
-                        
-                        Button("Save") {
-                            saveProcessedImage()
-                        }
-                        .buttonStyle(GlassButtonStyle())
-                        
-                        Button("Clear") {
-                            manager.clearImages()
-                        }
-                        .buttonStyle(GlassButtonStyle())
-                    }
-                    .disabled(manager.isLoading)
-                }
-            }
-            .padding(30)
-        }
-        .frame(minWidth: 600, minHeight: 700)
+                        .frame(minWidth: 600, minHeight: 700)
         .onDrop(of: [.image, .fileURL], isTargeted: $isDragging) { providers in
             loadFirstProvider(from: providers)
             return true
