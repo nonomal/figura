@@ -107,7 +107,6 @@ struct ContentView: View {
                 .ignoresSafeArea()
             
             VStack(spacing: 20) {
-                // Main content area
                 ZStack {
                     if let image = manager.processedImage {
                         Image(nsImage: image)
@@ -133,9 +132,19 @@ struct ContentView: View {
                             .frame(maxWidth: 400, maxHeight: 400)
                             .transition(.opacity)
                     } else {
-                        DropZoneView(isDragging: $isDragging) {
-                            handleImageSelection()
-                        }
+                        DropZoneView(isDragging: $isDragging, onTap: handleImageSelection)
+                            .overlay(
+                                Text("⌘V to paste")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(.secondary)
+                                    .padding(8)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .fill(Color.primary.opacity(0.05))
+                                    )
+                                    .padding(.bottom, 40),
+                                alignment: .bottom
+                            )
                     }
                     
                     if manager.isLoading {
@@ -153,36 +162,68 @@ struct ContentView: View {
                 .animation(.easeInOut, value: manager.processedImage != nil)
                 
                 if manager.processedImage != nil {
-                                    ButtonGroup(buttons: [
-                                        (
-                                            title: "Copy",
-                                            icon: "doc.on.doc",
-                                            action: {
-                                                if let image = manager.processedImage {
-                                                    copyImageToPasteboard(image)
-                                                }
-                                            }
-                                        ),
-                                        (
-                                            title: "Save",
-                                            icon: "arrow.down.circle",
-                                            action: saveProcessedImage
-                                        ),
-                                        (
-                                            title: "Clear",
-                                            icon: "trash",
-                                            action: manager.clearImages
-                                        )
-                                    ])
-                                    .disabled(manager.isLoading)
+                    ButtonGroup(buttons: [
+                        (
+                            title: "Copy",
+                            icon: "doc.on.doc",
+                            action: {
+                                if let image = manager.processedImage {
+                                    copyImageToPasteboard(image)
                                 }
                             }
-                            .padding(30)
-                        }
-                        .frame(minWidth: 600, minHeight: 700)
+                        ),
+                        (
+                            title: "Save",
+                            icon: "arrow.down.circle",
+                            action: saveProcessedImage
+                        ),
+                        (
+                            title: "Clear",
+                            icon: "trash",
+                            action: manager.clearImages
+                        )
+                    ])
+                    .disabled(manager.isLoading)
+                }
+            }
+            .padding(30)
+        }
+        .frame(minWidth: 600, minHeight: 700)
         .onDrop(of: [.image, .fileURL], isTargeted: $isDragging) { providers in
             loadFirstProvider(from: providers)
             return true
+        }
+        .onAppear {
+            NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+                if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "v" {
+                    handlePaste()
+                    return nil
+                }
+                return event
+            }
+        }
+    }
+    
+    private func handlePaste() {
+        let pasteboard = NSPasteboard.general
+        if let image = pasteboard.getImageFromPasteboard() {
+            manager.handleImageSelection(image)
+        }
+    }
+    
+    // Add shortcut keys to the menu bar
+    init() {
+        let pasteMenuItem = NSMenuItem(
+            title: "Paste Image",
+            action: #selector(NSApplication.sendAction(_:to:from:)),
+            keyEquivalent: "v"
+        )
+        pasteMenuItem.target = NSApp
+        pasteMenuItem.representedObject = handlePaste
+        
+        if let editMenu = NSApp.mainMenu?.item(withTitle: "Edit")?.submenu {
+            editMenu.addItem(NSMenuItem.separator())
+            editMenu.addItem(pasteMenuItem)
         }
     }
     
