@@ -21,6 +21,7 @@ Or download from the [releases](https://github.com/nuance-dev/Figura/releases/ta
 
 ## 🥑 Fun fact?
 - v1 was made with Claude Sonnet 3.5 in under 4 hours
+- Yes, I love cats
 
 ![Screenshot 2024-10-25 at 1 11 45 AM](https://github.com/user-attachments/assets/7d90b952-8049-4036-8761-285df0164985)
 
