@@ -1,4 +1,4 @@
-# Figura - A MacOS Background Remover
+# Figura - A MacOS Native Background Remover
 
 ![image](https://github.com/user-attachments/assets/dc2dc142-ef86-4655-9034-2cb1e52db842)
 
