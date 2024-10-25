@@ -4,11 +4,10 @@ import CoreImage.CIFilterBuiltins
 import UniformTypeIdentifiers
 import PhotosUI
 
-@Observable
-final class BackgroundRemovalManager: @unchecked Sendable {
-    var isLoading = false
-    var inputImage: NSImage?
-    var processedImage: NSImage?
+class BackgroundRemovalManager: ObservableObject {
+    @Published var isLoading = false
+    @Published var inputImage: NSImage?
+    @Published var processedImage: NSImage?
     private let processingQueue = DispatchQueue(label: "ProcessingImageQueue")
     private let lock = NSLock()
     
@@ -65,57 +64,53 @@ final class BackgroundRemovalManager: @unchecked Sendable {
 }
 
 struct ContentView: View {
-    @State private var manager = BackgroundRemovalManager()
+    @StateObject private var manager = BackgroundRemovalManager()
     @State private var showingPhotoPicker = false
+    @State private var isDragging = false
     
     var body: some View {
-        VStack(spacing: 20) {
-            if let image = manager.inputImage {
-                Image(nsImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxHeight: 300)
-            } else {
-                Text("Select or drop image")
-                    .font(.title)
-                    .foregroundColor(.gray)
-                    .frame(maxHeight: 300)
-            }
+        ZStack {
+            // Glass background
+            VisualEffectBlur(material: .headerView, blendingMode: .behindWindow)
+                .ignoresSafeArea()
             
-            if let processed = manager.processedImage {
-                Image(nsImage: processed)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxHeight: 300)
-                
-                Button("Save Processed Image") {
-                    saveProcessedImage()
-                }
-                .disabled(manager.isLoading)
-            }
-            
-            if manager.isLoading {
-                ProgressView()
-            }
-            
-            HStack {
-                Button("Choose Image") {
-                    showingPhotoPicker = true
-                }
-                .disabled(manager.isLoading)
-                
-                if manager.inputImage != nil {
-                    Button("Process Image") {
-                        if let image = manager.inputImage {
-                            manager.processImage(image)
-                        }
+            VStack(spacing: 20) {
+                // Image display area
+                ZStack {
+                    if let image = manager.processedImage {
+                        Image(nsImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: 400, maxHeight: 400)
+                            .transition(.opacity)
+                    } else if let image = manager.inputImage {
+                        Image(nsImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: 400, maxHeight: 400)
+                            .transition(.opacity)
+                    } else {
+                        DropZoneView(isDragging: $isDragging, showingPhotoPicker: $showingPhotoPicker)
                     }
+                    
+                    if manager.isLoading {
+                        LoaderView()
+                    }
+                }
+                .animation(.easeInOut, value: manager.processedImage != nil)
+                
+                // Save button
+                if manager.processedImage != nil {
+                    Button("Save Image") {
+                        saveProcessedImage()
+                    }
+                    .buttonStyle(GlassButtonStyle())
                     .disabled(manager.isLoading)
                 }
             }
+            .padding(30)
         }
-        .padding()
-        .frame(minWidth: 500, minHeight: 600)
+        .frame(minWidth: 600, minHeight: 700)
         .fileImporter(
             isPresented: $showingPhotoPicker,
             allowedContentTypes: [.image],
@@ -132,7 +127,7 @@ struct ContentView: View {
                 print("Error selecting image: \(error)")
             }
         }
-        .onDrop(of: [.image], isTargeted: nil) { providers in
+        .onDrop(of: [.image], isTargeted: $isDragging) { providers in
             guard let provider = providers.first else { return false }
             
             provider.loadItem(forTypeIdentifier: UTType.image.identifier, options: nil) { (data, error) in
