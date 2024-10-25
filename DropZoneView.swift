@@ -2,12 +2,10 @@ import SwiftUI
 
 struct DropZoneView: View {
     @Binding var isDragging: Bool
-    @Binding var showingPhotoPicker: Bool
+    let onTap: () -> Void
     
     var body: some View {
-        Button(action: {
-            showingPhotoPicker = true
-        }) {
+        Button(action: onTap) {
             VStack(spacing: 15) {
                 Image(systemName: "arrow.down.circle")
                     .font(.system(size: 50))
@@ -27,5 +25,12 @@ struct DropZoneView: View {
             .padding()
         }
         .buttonStyle(PlainButtonStyle())
+        .overlay(
+            isDragging ?
+            RoundedRectangle(cornerRadius: 15)
+                .stroke(Color.accentColor, lineWidth: 2)
+                .padding()
+            : nil
+        )
     }
 }

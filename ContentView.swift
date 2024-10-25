@@ -2,16 +2,13 @@ import SwiftUI
 import Vision
 import CoreImage.CIFilterBuiltins
 import UniformTypeIdentifiers
-import PhotosUI
+import AppKit
 
 class BackgroundRemovalManager: ObservableObject {
     @Published var isLoading = false
     @Published var inputImage: NSImage?
     @Published var processedImage: NSImage?
     @Published var uploadState: UploadState = .idle
-    
-    private let processingQueue = DispatchQueue(label: "ProcessingImageQueue")
-    private let lock = NSLock()
     
     enum UploadState {
         case idle
@@ -21,30 +18,53 @@ class BackgroundRemovalManager: ObservableObject {
         case error(String)
     }
     
+    func handleImageSelection(_ image: NSImage) {
+        print("Image received for processing")
+        Task { @MainActor in
+            self.uploadState = .uploading
+            self.inputImage = image
+            self.processImage(image)
+        }
+    }
+    
+    func clearImages() {
+            inputImage = nil
+            processedImage = nil
+            uploadState = .idle
+            isLoading = false
+        }
+    
     func processImage(_ image: NSImage) {
+        print("Starting image processing")
         guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            uploadState = .error("Failed to process image")
+            print("Failed to create CGImage")
+            Task { @MainActor in
+                self.uploadState = .error("Failed to process image")
+            }
             return
         }
         
         Task { @MainActor in
-            isLoading = true
-            uploadState = .processing
+            self.isLoading = true
+            self.uploadState = .processing
         }
         
         let ciImage = CIImage(cgImage: cgImage)
         let imageSize = image.size
         
         Task.detached(priority: .userInitiated) {
+            print("Processing image on background thread")
             if let maskImage = await self.createMaskImage(from: ciImage),
                let outputImage = self.apply(mask: maskImage, to: ciImage),
                let cgOutput = CIContext().createCGImage(outputImage, from: outputImage.extent) {
+                print("Image processing successful")
                 await MainActor.run {
                     self.processedImage = NSImage(cgImage: cgOutput, size: imageSize)
                     self.isLoading = false
                     self.uploadState = .completed
                 }
             } else {
+                print("Image processing failed")
                 await MainActor.run {
                     self.isLoading = false
                     self.uploadState = .error("Failed to process image")
@@ -79,7 +99,6 @@ class BackgroundRemovalManager: ObservableObject {
 
 struct ContentView: View {
     @StateObject private var manager = BackgroundRemovalManager()
-    @State private var showingPhotoPicker = false
     @State private var isDragging = false
     
     var body: some View {
@@ -88,6 +107,24 @@ struct ContentView: View {
                 .ignoresSafeArea()
             
             VStack(spacing: 20) {
+                // Header with clear button when image is present
+                if manager.inputImage != nil || manager.processedImage != nil {
+                    HStack {
+                        Spacer()
+                        Button(action: {
+                            manager.clearImages()
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                                .font(.system(size: 20))
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .help("Clear image")
+                    }
+                    .padding(.bottom, 5)
+                }
+                
+                // Main content area
                 ZStack {
                     if let image = manager.processedImage {
                         Image(nsImage: image)
@@ -102,6 +139,9 @@ struct ContentView: View {
                                 Button("Save Image") {
                                     saveProcessedImage()
                                 }
+                                Button("Clear") {
+                                    manager.clearImages()
+                                }
                             }
                     } else if let image = manager.inputImage {
                         Image(nsImage: image)
@@ -110,7 +150,9 @@ struct ContentView: View {
                             .frame(maxWidth: 400, maxHeight: 400)
                             .transition(.opacity)
                     } else {
-                        DropZoneView(isDragging: $isDragging, showingPhotoPicker: $showingPhotoPicker)
+                        DropZoneView(isDragging: $isDragging) {
+                            handleImageSelection()
+                        }
                     }
                     
                     if manager.isLoading {
@@ -140,6 +182,11 @@ struct ContentView: View {
                             saveProcessedImage()
                         }
                         .buttonStyle(GlassButtonStyle())
+                        
+                        Button("Clear") {
+                            manager.clearImages()
+                        }
+                        .buttonStyle(GlassButtonStyle())
                     }
                     .disabled(manager.isLoading)
                 }
@@ -147,39 +194,107 @@ struct ContentView: View {
             .padding(30)
         }
         .frame(minWidth: 600, minHeight: 700)
-        .fileImporter(
-            isPresented: $showingPhotoPicker,
-            allowedContentTypes: [.image],
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let urls):
-                if let url = urls.first,
-                   let image = NSImage(contentsOf: url) {
-                    manager.inputImage = image
-                    manager.processImage(image)
+        .onDrop(of: [.image, .fileURL], isTargeted: $isDragging) { providers in
+            loadFirstProvider(from: providers)
+            return true
+        }
+    }
+    
+    private func loadFirstProvider(from providers: [NSItemProvider]) {
+        guard let provider = providers.first else { return }
+        
+        // Try loading as file URL first
+        if provider.canLoadObject(ofClass: URL.self) {
+            provider.loadObject(ofClass: URL.self) { url, error in
+                if let error = error {
+                    print("Error loading URL: \(error)")
+                    return
                 }
-            case .failure(let error):
-                manager.uploadState = .error(error.localizedDescription)
+                
+                if let url = url {
+                    loadImage(from: url)
+                }
             }
         }
-        .onDrop(of: [.image], isTargeted: $isDragging) { providers in
-            guard let provider = providers.first else { return false }
-            
-            provider.loadItem(forTypeIdentifier: UTType.image.identifier, options: nil) { (data, error) in
-                if let imageData = data as? Data,
-                   let image = NSImage(data: imageData) {
+        // Then try loading as image
+        else if provider.canLoadObject(ofClass: NSImage.self) {
+            provider.loadObject(ofClass: NSImage.self) { image, error in
+                if let error = error {
+                    print("Error loading image: \(error)")
+                    return
+                }
+                
+                if let image = image as? NSImage {
                     Task { @MainActor in
-                        manager.inputImage = image
-                        manager.processImage(image)
-                    }
-                } else if let error = error {
-                    Task { @MainActor in
-                        manager.uploadState = .error(error.localizedDescription)
+                        manager.handleImageSelection(image)
                     }
                 }
             }
-            return true
+        }
+    }
+    
+    private func loadImage(from url: URL) {
+        guard url.startAccessingSecurityScopedResource() else { return }
+        defer { url.stopAccessingSecurityScopedResource() }
+        
+        if let image = NSImage(contentsOf: url) {
+            Task { @MainActor in
+                manager.handleImageSelection(image)
+            }
+        }
+    }
+    
+    private func handleImageSelection() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = [.image]
+        
+        panel.begin { response in
+            if response == .OK, let url = panel.url {
+                print("Image selected from panel: \(url)")
+                loadImage(from: url)
+            }
+        }
+    }
+    
+    private func handleDrop(providers: [NSItemProvider]) {
+        print("Handling drop with \(providers.count) providers")
+        
+        for provider in providers {
+            // First try loading as file URL
+            if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+                provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { urlData, error in
+                    if let error = error {
+                        print("Error loading file URL: \(error)")
+                        return
+                    }
+                    
+                    if let urlData = urlData as? Data,
+                       let url = URL(dataRepresentation: urlData, relativeTo: nil) {
+                        print("Loading image from URL: \(url)")
+                        loadImage(from: url)
+                    }
+                }
+            }
+            // Then try loading as image data
+            else if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+                provider.loadItem(forTypeIdentifier: UTType.image.identifier, options: nil) { imageData, error in
+                    if let error = error {
+                        print("Error loading image data: \(error)")
+                        return
+                    }
+                    
+                    if let imageData = imageData as? Data,
+                       let image = NSImage(data: imageData) {
+                        print("Loading image from data")
+                        Task { @MainActor in
+                            manager.handleImageSelection(image)
+                        }
+                    }
+                }
+            }
         }
     }
     
