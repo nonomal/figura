@@ -107,23 +107,6 @@ struct ContentView: View {
                 .ignoresSafeArea()
             
             VStack(spacing: 20) {
-                // Header with clear button when image is present
-                if manager.inputImage != nil || manager.processedImage != nil {
-                    HStack {
-                        Spacer()
-                        Button(action: {
-                            manager.clearImages()
-                        }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(.secondary)
-                                .font(.system(size: 20))
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .help("Clear image")
-                    }
-                    .padding(.bottom, 5)
-                }
-                
                 // Main content area
                 ZStack {
                     if let image = manager.processedImage {
@@ -205,28 +188,34 @@ struct ContentView: View {
         
         // Try loading as file URL first
         if provider.canLoadObject(ofClass: URL.self) {
-            provider.loadObject(ofClass: URL.self) { url, error in
+            _ = provider.loadObject(ofClass: URL.self) { url, error in
                 if let error = error {
                     print("Error loading URL: \(error)")
+                    Task { @MainActor in
+                        self.manager.uploadState = .error("Failed to load dropped file")
+                    }
                     return
                 }
                 
                 if let url = url {
-                    loadImage(from: url)
+                    self.loadImage(from: url)
                 }
             }
         }
         // Then try loading as image
         else if provider.canLoadObject(ofClass: NSImage.self) {
-            provider.loadObject(ofClass: NSImage.self) { image, error in
+            _ = provider.loadObject(ofClass: NSImage.self) { image, error in
                 if let error = error {
                     print("Error loading image: \(error)")
+                    Task { @MainActor in
+                        self.manager.uploadState = .error("Failed to load dropped image")
+                    }
                     return
                 }
                 
                 if let image = image as? NSImage {
                     Task { @MainActor in
-                        manager.handleImageSelection(image)
+                        self.manager.handleImageSelection(image)
                     }
                 }
             }
