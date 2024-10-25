@@ -19,7 +19,7 @@ You can find the .app here:
 
 Or download from the [releases](https://github.com/nuance-dev/Figura/releases/tag/Release) page.
 
-## 🥑 Fun fact?
+## 🥑 Fun facts?
 - v1 was made with Claude Sonnet 3.5 in under 4 hours
 - Yes, I love cats
 
