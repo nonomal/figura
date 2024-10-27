@@ -17,10 +17,8 @@ https://github.com/user-attachments/assets/2599e483-8a5e-4147-8a81-c647a6e9f1cb
 
 
 ## 💻 Get it
-App's website to download (WIP):
-[figura.vercel.app](https://figurado.vercel.app)
 
-Or download from the [releases](https://github.com/nuance-dev/Figura/releases/tag/Releases) page.
+Download from the [releases](https://github.com/nuance-dev/Figura/releases/) page.
 
 ## 🥑 Fun facts?
 - v1 was made with Claude Sonnet 3.5 in under 4 hours
