@@ -46,6 +46,5 @@ Please ensure your PR:
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🔗 Links
-- Website: [figura.vercel.app](https://figurado.vercel.app)
 - Report issues: [GitHub Issues](https://github.com/nuance-dev/Figura/issues)
 - Follow updates: [@Nuanced](https://twitter.com/Nuancedev)
