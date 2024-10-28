@@ -5,6 +5,8 @@
 
 A sleek, free native macOS app that removes backgrounds from images with a minimal interface and modern design. It's fast!
 
+Note: This app wraps macOS's own native background removing functionality, and it requires macOS version 14+
+
 ## Features
 - **One-Click Background Removal**: Instantly remove backgrounds from any image
 - **Multiple Input Methods**: Drag & drop, paste (⌘V), or click to upload
