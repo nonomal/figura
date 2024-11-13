@@ -111,6 +111,11 @@ struct MenuBarView: View {
                 .foregroundColor(.secondary)
             }
             .padding(.bottom, 16)
+            
+            Text("Built by [Nuance](https://nuancedev.vercel.app)")
+                .font(.footnote)
+                .foregroundColor(.secondary)
+                .padding(.bottom, 8)
         }
         .padding(.horizontal)
         .frame(width: 300)
