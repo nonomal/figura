@@ -338,7 +338,11 @@ struct ContentView: View {
     }
     
     private func saveProcessedImage() {
-        guard let processedImage = manager.processedImage else { return }
+        print("Starting save process...")
+        guard let processedImage = manager.processedImage else {
+            print("No processed image available")
+            return
+        }
         
         let savePanel = NSSavePanel()
         savePanel.allowedContentTypes = [.png]
@@ -348,17 +352,38 @@ struct ContentView: View {
         savePanel.message = "Choose a location to save the processed image"
         savePanel.nameFieldStringValue = "processed_image.png"
         
+        print("Running save panel...")
         let response = savePanel.runModal()
+        print("Save panel response: \(response == .OK ? "OK" : "Cancel")")
         
         if response == .OK,
-           let url = savePanel.url,
-           let tiffData = processedImage.tiffRepresentation,
-           let bitmap = NSBitmapImageRep(data: tiffData),
-           let pngData = bitmap.representation(using: .png, properties: [:]) {
-            do {
-                try pngData.write(to: url)
-            } catch {
-                manager.uploadState = .error("Failed to save image: \(error.localizedDescription)")
+           let url = savePanel.url {
+            print("Save location selected: \(url.path)")
+            
+            if let tiffData = processedImage.tiffRepresentation {
+                print("TIFF representation created")
+                if let bitmap = NSBitmapImageRep(data: tiffData) {
+                    print("Bitmap created")
+                    if let pngData = bitmap.representation(using: .png, properties: [:]) {
+                        print("PNG data created")
+                        do {
+                            try pngData.write(to: url)
+                            print("Image saved successfully")
+                        } catch {
+                            print("Failed to save image: \(error.localizedDescription)")
+                            manager.uploadState = .error("Failed to save image: \(error.localizedDescription)")
+                        }
+                    } else {
+                        print("Failed to create PNG data")
+                        manager.uploadState = .error("Failed to create PNG data")
+                    }
+                } else {
+                    print("Failed to create bitmap from TIFF data")
+                    manager.uploadState = .error("Failed to create bitmap from TIFF data")
+                }
+            } else {
+                print("Failed to create TIFF representation")
+                manager.uploadState = .error("Failed to create TIFF representation")
             }
         }
     }
